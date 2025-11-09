@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { font-family: Poppins, ui-sans-serif, system-ui; }
+body {
+  min-height: 100vh;
+  background-color: #020617;
+}
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 48; }
+
+.card-enter-active,
+.card-leave-active {
+  transition: all 0.25s ease;
+}
+.card-enter-from,
+.card-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}

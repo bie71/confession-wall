@@ -1,0 +1,15 @@
+{
+  "name": "confession-wall",
+  "private": true,
+  "scripts": {
+    "dev": "bun run index.ts",
+    "db:seed": "bun run scripts/seed.ts",
+    "web:dev": "cd web && bun run dev",
+    "web:build": "cd web && bun run build",
+    "web:preview": "cd web && bun run preview"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.33.0",
+    "hono": "^4.6.0"
+  }
+}

@@ -1,0 +1,16 @@
+services:
+  api:
+    build: .
+    container_name: confession_api
+    ports: ["8080:8080"]
+    environment:
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-supersecretadmin}
+      - PORT=8080
+    volumes:
+      - ./confession.db:/app/confession.db
+
+  web:
+    build: ./web
+    container_name: confession_web
+    ports: ["5173:80"]
+    depends_on: [api]
