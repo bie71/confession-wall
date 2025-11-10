@@ -46,4 +46,11 @@ export const api = {
     });
     return r.json();
   },
+  async verifyAdmin(adminToken:string) {
+    const r = await fetch(`/api/admin/verify`, {
+      headers:{ 'Authorization': `Bearer ${adminToken}` }
+    });
+    if (!r.ok) throw new Error('Token invalid');
+    return r.json();
+  }
 };

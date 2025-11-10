@@ -11,6 +11,9 @@ app.use("*", cors());
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "devadmin";
 
+console.log(`Admin token: ${ADMIN_TOKEN}`);
+
+
 // naive bad-words list (demo)
 const BAD_WORDS = ["bangsat","anjing","goblok"];
 
@@ -145,6 +148,10 @@ app.post("/api/confessions/:id/reject", bearerAuth({ token: ADMIN_TOKEN }), asyn
   const item = row.rows?.[0] ?? null;
   broadcast({ type: "rejected", item });
   return c.json(item);
+});
+
+app.get("/api/admin/verify", bearerAuth({ token: ADMIN_TOKEN }), (c) => {
+  return c.json({ ok: true });
 });
 
 // DELETE (admin)
