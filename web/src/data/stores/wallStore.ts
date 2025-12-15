@@ -13,7 +13,7 @@ export const useWallStore = defineStore('wall', () => {
   // --- State ---
   const items = ref<Confession[]>([]);
   const q = ref('');
-  const status = ref<ConfessionStatus>('APPROVED');
+  const status = ref<ConfessionStatus | undefined>('APPROVED');
   const page = ref(1);
   const limit = ref(10);
   const total = ref(0);

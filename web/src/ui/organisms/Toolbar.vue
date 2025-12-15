@@ -98,12 +98,19 @@ const { q, status } = storeToRefs(wall);
 const localQuery = ref(q.value);
 
 const statusOptions = [
+  { value: undefined, label: "Semua" }, // New "All" option
   { value: "APPROVED", label: "Publik" },
   { value: "PENDING", label: "Pending" },
   { value: "REJECTED", label: "Ditolak" },
 ];
 const canFilterStatus = computed(() => props.isAdmin);
-const exportHref = computed(() => confessionApiRepository.exportUrl({ q: q.value, status: status.value }));
+const exportHref = computed(() => {
+    const params: { q?: string; status?: ConfessionStatus } = { q: q.value };
+    if (status.value !== undefined) { // Only add status param if not "All"
+        params.status = status.value;
+    }
+    return confessionApiRepository.exportUrl(params);
+});
 
 const panelClass = computed(() =>
   props.theme === "light" ? "border-slate-200 bg-white text-slate-900" : "border-white/10 bg-white/10 text-slate-200"
@@ -153,7 +160,14 @@ watch(localQuery, () => {
 
 const apply = (force = false) => {
   const nextQ = localQuery.value.trim();
-  const nextStatus = canFilterStatus.value ? status.value : "APPROVED";
+  let nextStatus: ConfessionStatus | undefined;
+
+  if (canFilterStatus.value) {
+    nextStatus = status.value; // Use current status if admin
+  } else {
+    nextStatus = "APPROVED"; // Default to APPROVED for non-admins
+  }
+
   const needRefresh = force || nextQ !== wall.q || nextStatus !== wall.status;
   
   wall.q = nextQ;
@@ -166,11 +180,11 @@ const apply = (force = false) => {
 
 const resetFilters = () => {
   localQuery.value = "";
-  status.value = "APPROVED";
+  status.value = undefined; // Reset to "All"
   apply(true);
 };
 
-const setStatus = (value: ConfessionStatus) => {
+const setStatus = (value: ConfessionStatus | undefined) => { // Allow undefined
   status.value = value;
   apply(true);
 };

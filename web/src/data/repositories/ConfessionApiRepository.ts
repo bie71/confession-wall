@@ -30,7 +30,7 @@ export class ConfessionApiRepository {
   }
 
   exportUrl(params: { q?: string; status?: string }): string {
-    const u = new URL('/api/confessions/export.csv', location.origin);
+    const u = new URL('/api/admin/confessions/export.csv', location.origin);
     if (params.q) u.searchParams.set('q', params.q);
     if (params.status) u.searchParams.set('status', params.status);
     return u.toString();

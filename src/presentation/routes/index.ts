@@ -49,27 +49,6 @@ app.get("/api/confessions", async (c) => {
   }
 });
 
-app.get("/api/confessions/export.csv", async (c) => {
-  const log = c.get('logger');
-  try {
-    const url = new URL(c.req.url);
-    const q = url.searchParams.get("q")?.trim();
-    const status = url.searchParams.get("status")?.toUpperCase() as ConfessionStatus;
-    
-    const confessions = await useCases.exportConfessions.execute({ query: q, status });
-    const csv = toCSV(confessions);
-    return new Response(csv, {
-        headers: {
-            "Content-Type": "text/csv; charset=utf-8",
-            "Content-Disposition": `attachment; filename="confessions.csv"`
-        }
-    });
-  } catch (error: any) {
-    log.error({ err: error, errorMessage: error.message }, 'Failed to export confessions');
-    return c.json({ error: 'Internal Server Error' }, 500);
-  }
-});
-
 app.post("/api/confessions", async (c) => {
   const log = c.get('logger');
   try {
@@ -152,6 +131,27 @@ const admin = new Hono();
 admin.use("*", adminAuthMiddleware()); // Protect all admin routes
 
 admin.get("/verify", (c) => c.json({ verified: true })); // Simple endpoint to verify admin token
+
+admin.get("/confessions/export.csv", async (c) => {
+  const log = c.get('logger');
+  try {
+    const url = new URL(c.req.url);
+    const q = url.searchParams.get("q")?.trim();
+    const status = url.searchParams.get("status")?.toUpperCase() as ConfessionStatus;
+    
+    const confessions = await useCases.exportConfessions.execute({ query: q, status });
+    const csv = toCSV(confessions);
+    return new Response(csv, {
+        headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": `attachment; filename="confessions.csv"`
+        }
+    });
+  } catch (error: any) {
+    log.error({ err: error, errorMessage: error.message }, 'Failed to export confessions');
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
 
 admin.post("/confessions/:id/approve", async (c) => {
   const log = c.get('logger');
