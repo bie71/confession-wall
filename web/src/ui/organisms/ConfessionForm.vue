@@ -18,22 +18,24 @@
 
       <div>
         <label :class="['text-xs uppercase tracking-[0.3em]', themeConfig.label]">Nama (opsional)</label>
-        <input
+        <BaseInput
           v-model.trim="name"
           type="text"
           maxlength="40"
-          :class="themeConfig.input"
+          :theme="theme"
+          class="mt-2"
           placeholder="Isi nama panggilan atau biarkan kosong"
         />
       </div>
 
       <div>
         <label :class="['text-xs uppercase tracking-[0.3em]', themeConfig.label]">Isi pesan</label>
-        <textarea
+        <BaseTextarea
           v-model="message"
           rows="4"
           maxlength="500"
-          :class="[themeConfig.input, 'min-h-[120px]']"
+          :theme="theme"
+          class="mt-2 min-h-[120px]"
           placeholder="Tulis minimal 3 karakter. Link otomatis ditandai pending untuk dicek admin."
         />
         <div class="mt-1 flex items-center justify-between text-xs">
@@ -50,20 +52,22 @@
         {{ feedback.message }}
       </p>
       <div class="ml-auto flex items-center gap-3">
-        <button
-          :class="['rounded-2xl border px-4 py-2 text-sm font-semibold transition', themeConfig.ghostButton]"
+        <BaseButton
+          :theme="theme"
+          variant="ghost"
           type="button"
           @click="clearForm"
         >
           Hapus
-        </button>
-        <button
-          :class="['rounded-2xl px-6 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60', themeConfig.primaryButton]"
+        </BaseButton>
+        <BaseButton
+          :theme="theme"
+          variant="primary"
           type="submit"
           :disabled="!canSubmit || sending"
         >
           {{ sending ? "Mengirim..." : "Kirim" }}
-        </button>
+        </BaseButton>
       </div>
     </div>
   </form>
@@ -71,15 +75,18 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { api } from "../lib/api";
-import { wall } from "../store/wall";
+import { confessionApiRepository } from '../../data/repositories/ConfessionApiRepository';
+
+import BaseInput from '../atoms/BaseInput.vue';
+import BaseTextarea from '../atoms/BaseTextarea.vue';
+import BaseButton from '../atoms/BaseButton.vue';
 
 const props = defineProps<{ theme: "dark" | "light" }>();
 
 const MAX_CHAR = 500;
 const name = ref("");
 const message = ref("");
-const website = ref("");
+const website = ref(""); // Honeypot
 const sending = ref(false);
 const feedback = ref<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -89,11 +96,7 @@ const themeMap = {
     heading: "text-white",
     label: "text-slate-300",
     badge: "border-white/20 text-emerald-200",
-    input:
-      "mt-2 w-full rounded-2xl border border-white/15 bg-slate-900/40 px-4 py-2 text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none",
     subtle: "text-slate-400",
-    ghostButton: "border-white/15 text-slate-200 hover:bg-white/10",
-    primaryButton: "bg-emerald-400/90 text-emerald-950 hover:bg-emerald-300",
     success: "text-emerald-300",
     shadow: "shadow-[0_25px_60px_rgba(2,6,23,0.45)]",
   },
@@ -102,11 +105,7 @@ const themeMap = {
     heading: "text-slate-900",
     label: "text-slate-600",
     badge: "border-emerald-200 bg-emerald-50 text-emerald-600",
-    input:
-      "mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none",
     subtle: "text-slate-500",
-    ghostButton: "border-slate-300 text-slate-600 hover:bg-slate-100",
-    primaryButton: "bg-emerald-500 text-white hover:bg-emerald-400",
     success: "text-emerald-500",
     shadow: "shadow-[0_12px_32px_rgba(15,23,42,0.12)]",
   },
@@ -128,18 +127,16 @@ const submit = async () => {
   sending.value = true;
   feedback.value = null;
   try {
-    const res = await api.create({
+    const res = await confessionApiRepository.create({
       name: name.value.trim(),
       message: message.value.trim(),
       website: website.value,
     });
-    if (res?.error) throw new Error(res.error);
     feedback.value = {
       type: "success",
       message: res.status === "PENDING" ? "Terkirim! Menunggu moderasi." : "Terkirim dan sudah tampil publik.",
     };
     clearForm();
-    wall.refresh();
   } catch (err: any) {
     feedback.value = { type: "error", message: err?.message || "Gagal mengirim. Coba lagi ya." };
   } finally {

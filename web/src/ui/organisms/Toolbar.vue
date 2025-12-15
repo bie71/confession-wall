@@ -81,23 +81,29 @@
 </template>
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { wall } from "../store/wall";
-import { api } from "../lib/api";
+import { storeToRefs } from "pinia";
+import { useWallStore } from "../../data/stores/wallStore";
+import { confessionApiRepository } from "../../data/repositories/ConfessionApiRepository";
+import type { ConfessionStatus } from "../../domain/models/Confession";
 
 const props = defineProps<{ isAdmin: boolean; theme: "dark" | "light" }>();
 defineEmits<{
   (e: "toggle-theme"): void;
 }>();
 
-const q = ref(wall.q);
-const status = ref(wall.status);
+const wall = useWallStore();
+const { q, status } = storeToRefs(wall);
+
+const localQuery = ref(q.value);
+
 const statusOptions = [
   { value: "APPROVED", label: "Publik" },
   { value: "PENDING", label: "Pending" },
   { value: "REJECTED", label: "Ditolak" },
 ];
 const canFilterStatus = computed(() => props.isAdmin);
-const exportHref = computed(() => api.exportUrl({ q: wall.q, status: wall.status }));
+const exportHref = computed(() => confessionApiRepository.exportUrl({ q: q.value, status: status.value }));
+
 const panelClass = computed(() =>
   props.theme === "light" ? "border-slate-200 bg-white text-slate-900" : "border-white/10 bg-white/10 text-slate-200"
 );
@@ -134,41 +140,36 @@ const themeButtonClass = computed(() =>
     : "border-white/20 bg-white/5 text-slate-200 hover:bg-white/10"
 );
 
-watch(
-  () => wall.q,
-  (val) => {
-    q.value = val;
-  }
-);
-watch(
-  () => wall.status,
-  (val) => {
-    status.value = val;
-  }
-);
+watch(q, (newQuery) => {
+  localQuery.value = newQuery;
+});
 
 let debounce: ReturnType<typeof setTimeout> | undefined;
-watch(q, () => {
+watch(localQuery, () => {
   if (debounce) clearTimeout(debounce);
   debounce = setTimeout(() => apply(), 450);
 });
 
 const apply = (force = false) => {
-  const nextQ = q.value.trim();
+  const nextQ = localQuery.value.trim();
   const nextStatus = canFilterStatus.value ? status.value : "APPROVED";
   const needRefresh = force || nextQ !== wall.q || nextStatus !== wall.status;
+  
   wall.q = nextQ;
   wall.status = nextStatus;
-  if (needRefresh) wall.refresh();
+  
+  if (needRefresh) {
+    wall.refresh();
+  }
 };
 
 const resetFilters = () => {
-  q.value = "";
+  localQuery.value = "";
   status.value = "APPROVED";
   apply(true);
 };
 
-const setStatus = (value: string) => {
+const setStatus = (value: ConfessionStatus) => {
   status.value = value;
   apply(true);
 };
