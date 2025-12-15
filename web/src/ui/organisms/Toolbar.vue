@@ -54,15 +54,16 @@
     </div>
 
     <div class="mt-5 flex flex-wrap items-center gap-3">
-      <a
+      <button
         v-if="isAdmin"
-        :href="exportHref"
-        target="_blank"
+        type="button"
         :class="['inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold transition', ghostButton]"
+        @click="handleExportCsv"
+        :disabled="isExporting"
       >
-        <span class="material-symbols-outlined text-base">download</span>
-        Export CSV
-      </a>
+        <span class="material-symbols-outlined text-base">{{ isExporting ? 'hourglass_empty' : 'download' }}</span>
+        {{ isExporting ? 'Exporting...' : 'Export CSV' }}
+      </button>
       <button
         type="button"
         :class="['rounded-2xl border px-4 py-2 text-sm font-semibold transition', ghostButton]"
@@ -84,6 +85,7 @@
 import { computed, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useWallStore } from "../../data/stores/wallStore";
+import { useAuthStore } from "../../data/stores/authStore"; // Import auth store
 import { confessionApiRepository } from "../../data/repositories/ConfessionApiRepository";
 import type { ConfessionStatus } from "../../domain/models/Confession";
 
@@ -94,8 +96,10 @@ defineEmits<{
 
 const wall = useWallStore();
 const { q, status } = storeToRefs(wall);
+const auth = useAuthStore(); // Access auth store
 
 const localQuery = ref(q.value);
+const isExporting = ref(false);
 
 const statusOptions = [
   { value: undefined, label: "Semua" }, // New "All" option
@@ -104,13 +108,6 @@ const statusOptions = [
   { value: "REJECTED", label: "Ditolak" },
 ];
 const canFilterStatus = computed(() => props.isAdmin);
-const exportHref = computed(() => {
-    const params: { q?: string; status?: ConfessionStatus } = { q: q.value };
-    if (status.value !== undefined) { // Only add status param if not "All"
-        params.status = status.value;
-    }
-    return confessionApiRepository.exportUrl(params);
-});
 
 const panelClass = computed(() =>
   props.theme === "light" ? "border-slate-200 bg-white text-slate-900" : "border-white/10 bg-white/10 text-slate-200"
@@ -188,4 +185,56 @@ const setStatus = (value: ConfessionStatus | undefined) => { // Allow undefined
   status.value = value;
   apply(true);
 };
+
+const handleExportCsv = async () => {
+  if (!props.isAdmin || !auth.token) {
+    alert("You must be logged in as an admin to export CSV.");
+    return;
+  }
+
+  isExporting.value = true;
+  try {
+    const params: { q?: string; status?: ConfessionStatus } = { q: q.value };
+    if (status.value !== undefined) {
+        params.status = status.value;
+    }
+    const url = confessionApiRepository.exportUrl(params);
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${auth.token}`,
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        alert("Unauthorized to export CSV. Please log in as an admin.");
+        auth.logout(); // Optionally log out if token is invalid
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to export CSV: ${errorData.error || response.statusText}`);
+      }
+      return;
+    }
+
+    const blob = await response.blob();
+    const filename = `confessions_export_${status.value || 'all'}_${new Date().toISOString()}.csv`;
+    
+    // Create a temporary URL and download link
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+
+  } catch (error: any) {
+    alert(`An error occurred during export: ${error.message}`);
+  } finally {
+    isExporting.value = false;
+  }
+};
+
 </script>
