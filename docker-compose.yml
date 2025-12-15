@@ -3,14 +3,29 @@ services:
     build: .
     container_name: confession_api
     ports: ["8080:8080"]
+    depends_on:
+      - db
     environment:
+      - DATABASE_URL=postgres://postgres:dev@db:5432/confessiondb
       - ADMIN_TOKEN=${ADMIN_TOKEN:-supersecretadmin}
       - PORT=8080
-    volumes:
-      - ./confession.db:/app/confession.db
 
   web:
     build: ./web
     container_name: confession_web
     ports: ["5173:80"]
     depends_on: [api]
+
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: confession_db
+    ports: ["5432:5432"]
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=dev
+      - POSTGRES_DB=confessiondb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

@@ -22,19 +22,27 @@
                 tampil di halaman publik.
               </p>
             </div>
+            
+            <!-- Auth Section -->
             <div :class="['rounded-2xl border p-4', themeClasses.fieldWrapper]">
-              <label :class="['text-xs font-semibold uppercase tracking-widest', themeClasses.label]">Admin token</label>
-              <input
-                v-model="adminToken"
-                type="password"
-                placeholder="Masukkan token"
-                :class="themeClasses.input"
-              />
-              <p :class="['mt-2 text-xs min-h-[1.25rem]', themeClasses.subtle]" v-if="adminState.checking">Memeriksa token...</p>
-              <p :class="['mt-2 text-xs min-h-[1.25rem]', themeClasses.success]" v-else-if="adminState.valid">Token valid. Hak admin aktif.</p>
-              <p :class="['mt-2 text-xs min-h-[1.25rem]', themeClasses.error]" v-else-if="adminState.error">{{ adminState.error }}</p>
-              <p :class="['mt-2 text-xs min-h-[1.25rem]', themeClasses.subtle]" v-else>Token disimpan aman di browser kamu.</p>
+              <div v-if="isLoggedIn && auth.user" class="flex items-center gap-3">
+                <div>
+                  <p :class="['font-semibold', themeClasses.heading]">Welcome, {{ auth.user.name }}</p>
+                  <p :class="['text-xs', themeClasses.subtle]">
+                    You are logged in as an <span class="font-semibold">{{ auth.user.role }}</span>.
+                  </p>
+                </div>
+                <BaseButton :theme="theme" variant="ghost" @click="handleLogout" class="ml-auto !px-3 !py-1">
+                  Logout
+                </BaseButton>
+              </div>
+              <div v-else class="flex items-center justify-center gap-4">
+                  <router-link to="/login" class="font-semibold text-emerald-400 hover:underline">Login</router-link>
+                  <span :class="themeClasses.subtle">or</span>
+                  <router-link to="/register" class="font-semibold text-emerald-400 hover:underline">Register</router-link>
+              </div>
             </div>
+
           </header>
 
           <dl class="mt-6 grid gap-4 sm:grid-cols-3">
@@ -93,7 +101,7 @@
             v-for="it in wall.items"
             :key="it.id"
             :item="it"
-            :admin-token="adminToken"
+            :is-admin="isAdmin"
             :theme="theme"
             @vote="(v) => vote(it.id, v)"
             @approve="approve(it.id)"
@@ -133,20 +141,24 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { storeToRefs } from 'pinia';
+import { useRouter } from 'vue-router';
 import { useWallStore } from '../../data/stores/wallStore';
+import { useAuthStore } from '../../data/stores/authStore';
 import { useTheme } from '../composables/useTheme';
-import { useAdmin } from '../composables/useAdmin';
 import { confessionApiRepository } from '../../data/repositories/ConfessionApiRepository';
 
 import Toolbar from "../organisms/Toolbar.vue";
 import ConfessionForm from "../organisms/ConfessionForm.vue";
 import ConfessionCard from "../organisms/ConfessionCard.vue";
+import BaseButton from "../atoms/BaseButton.vue";
 
 const wall = useWallStore();
-const { items, total, page, limit, loading, hasMore, totalPages, currentPage } = storeToRefs(wall);
+const auth = useAuthStore();
+const router = useRouter();
+const { items, total, loading, hasMore, totalPages, currentPage } = storeToRefs(wall);
+const { isLoggedIn, isAdmin } = storeToRefs(auth);
 
 const { theme, themeClasses, toggleTheme } = useTheme();
-const { adminToken, adminState, isAdmin, requireAdmin } = useAdmin();
 
 const loadMoreRef = ref<HTMLButtonElement | null>(null);
 let observer: IntersectionObserver | null = null;
@@ -175,19 +187,35 @@ const emptyCopy = computed(() => {
   return { title: "Belum ada confession.", body: "Jadilah yang pertama menulis lewat formulir di atas." };
 });
 
+const handleLogout = () => {
+    auth.logout();
+    router.go(0); // Force a page reload to reset all state
+}
+
 const vote = async (id: number, value: 1 | -1) => {
   try {
     await confessionApiRepository.vote(id, value);
-    // The WS will update the UI, but we can refresh for immediate feedback if needed
-    // wall.refresh();
   } catch (error) {
     alert((error as Error).message);
   }
 };
+
+const requireAdmin = () => {
+    if (!isAdmin.value) {
+        alert("You must be an admin to perform this action.");
+        return false;
+    }
+    if (!auth.token) {
+        alert("Authentication token not found.");
+        return false;
+    }
+    return true;
+}
+
 const approve = async (id: number) => {
   if (!requireAdmin()) return;
   try {
-    await confessionApiRepository.approve(id, adminToken.value);
+    await confessionApiRepository.approve(id, auth.token!);
     wall.refresh();
   } catch (error) {
     alert((error as Error).message);
@@ -196,7 +224,7 @@ const approve = async (id: number) => {
 const reject = async (id: number) => {
   if (!requireAdmin()) return;
   try {
-    await confessionApiRepository.reject(id, adminToken.value);
+    await confessionApiRepository.reject(id, auth.token!);
     wall.refresh();
   } catch (error) {
     alert((error as Error).message);
@@ -205,7 +233,8 @@ const reject = async (id: number) => {
 const remove = async (id: number) => {
   if (!requireAdmin()) return;
   try {
-    await confessionApiRepository.remove(id, adminToken.value);
+    await confessionApiRepository.remove(id, auth.token!);
+    wall.refresh(); // Also refresh on remove
   } catch (error) {
     alert('Gagal hapus. ' + (error as Error).message);
   }

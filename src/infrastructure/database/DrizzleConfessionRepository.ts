@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, sql, desc, count } from "drizzle-orm";
 import {
   IConfessionRepository,
   FindAllConfessionsOptions,
@@ -8,29 +8,36 @@ import { Confession } from "../../domain/entities/Confession";
 import { db, schema } from "./index";
 
 export class DrizzleConfessionRepository implements IConfessionRepository {
-  async create(data: Omit<Confession, 'id' | 'likes' | 'dislikes' | 'createdAt'>): Promise<Confession> {
-    const result = await db.insert(schema.confessions).values(data).returning().get();
-    return result as Confession;
+  async create(data: Omit<Confession, 'id' | 'likes' | 'dislikes' | 'createdAt'> & { embedding: number[], userId?: number | null }): Promise<Confession> {
+    const result = await db.insert(schema.confessions).values(data).returning();
+    return result[0];
   }
 
   async update(id: number, data: Partial<Pick<Confession, 'status' | 'likes' | 'dislikes'>>): Promise<Confession | null> {
+    let updatedConfession: Confession[] = [];
     if (data.likes) {
-      await db.execute({ sql: `UPDATE confessions SET likes = likes + ? WHERE id = ?`, params: [data.likes, id] });
+      updatedConfession = await db.update(schema.confessions)
+        .set({ likes: sql`${schema.confessions.likes} + 1` })
+        .where(eq(schema.confessions.id, id))
+        .returning();
     } else if (data.dislikes) {
-      await db.execute({ sql: `UPDATE confessions SET dislikes = dislikes + ? WHERE id = ?`, params: [data.dislikes, id] });
+      updatedConfession = await db.update(schema.confessions)
+        .set({ dislikes: sql`${schema.confessions.dislikes} + 1` })
+        .where(eq(schema.confessions.id, id))
+        .returning();
     } else {
-      await db.update(schema.confessions).set(data).where(eq(schema.confessions.id, id)).run();
+      updatedConfession = await db.update(schema.confessions).set(data).where(eq(schema.confessions.id, id)).returning();
     }
-    return this.findById(id);
+    return updatedConfession[0] || null;
   }
 
   async delete(id: number): Promise<void> {
-    await db.delete(schema.confessions).where(eq(schema.confessions.id, id)).run();
+    await db.delete(schema.confessions).where(eq(schema.confessions.id, id));
   }
 
   async findById(id: number): Promise<Confession | null> {
-    const result = await db.select().from(schema.confessions).where(eq(schema.confessions.id, id)).get();
-    return result as Confession || null;
+    const result = await db.select().from(schema.confessions).where(eq(schema.confessions.id, id));
+    return result[0] || null;
   }
 
   async findAll(options: FindAllConfessionsOptions): Promise<PaginatedConfessions> {
@@ -38,29 +45,31 @@ export class DrizzleConfessionRepository implements IConfessionRepository {
     const limit = options.limit || 10;
     const offset = (page - 1) * limit;
 
-    const params: any[] = [];
-    const wh: string[] = [];
-
+    const whereConditions = [];
     if (options.query) {
-      wh.push("(message LIKE ? OR IFNULL(name,'') LIKE ?)");
-      params.push(`%${options.query}%`, `%${options.query}%`);
+        whereConditions.push(or(
+            sql`message ILIKE ${'%' + options.query + '%'}`,
+            sql`name ILIKE ${'%' + options.query + '%'}`
+        ));
     }
     if (options.status) {
-      wh.push("status = ?");
-      params.push(options.status);
+        whereConditions.push(eq(schema.confessions.status, options.status));
     }
-    const where = wh.length ? ("WHERE " + wh.join(" AND ")) : "";
+    
+    const where = and(...whereConditions);
 
-    const countResult = await db.execute({ sql: `SELECT COUNT(*) as c FROM confessions ${where}`, params });
-    const total = Number(countResult.rows?.[0]?.c || 0);
+    const totalResult = await db.select({ value: count() }).from(schema.confessions).where(where);
+    const total = totalResult[0].value;
 
-    const itemsResult = await db.execute({
-      sql: `SELECT * FROM confessions ${where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
-      params: [...params, limit, offset],
-    });
+    const items = await db.select()
+      .from(schema.confessions)
+      .where(where)
+      .orderBy(desc(schema.confessions.createdAt), desc(schema.confessions.id))
+      .limit(limit)
+      .offset(offset);
 
     return {
-      items: itemsResult.rows as Confession[] ?? [],
+      items,
       total,
       page,
       limit,
@@ -68,22 +77,30 @@ export class DrizzleConfessionRepository implements IConfessionRepository {
   }
 
   async export(options: Omit<FindAllConfessionsOptions, 'page' | 'limit'>): Promise<Confession[]> {
-    const params:any[] = [];
-    const wh: string[] = [];
+    const whereConditions = [];
     if (options.query) {
-      wh.push("(message LIKE ? OR IFNULL(name,'') LIKE ?)");
-      params.push(`%${options.query}%`, `%${options.query}%`);
+        whereConditions.push(or(
+            sql`message ILIKE ${'%' + options.query + '%'}`,
+            sql`name ILIKE ${'%' + options.query + '%'}`
+        ));
     }
     if (options.status) {
-      wh.push("status = ?");
-      params.push(options.status);
+        whereConditions.push(eq(schema.confessions.status, options.status));
     }
-    const where = wh.length ? ("WHERE " + wh.join(" AND ")) : "";
 
-    const result = await db.execute({
-      sql: `SELECT id, name, message, likes, dislikes, created_at, status FROM confessions ${where} ORDER BY created_at DESC, id DESC`,
-      params
-    });
-    return result.rows as Confession[];
+    const where = and(...whereConditions);
+    
+    return db.select().from(schema.confessions).where(where).orderBy(desc(schema.confessions.createdAt), desc(schema.confessions.id));
+  }
+
+  async findSimilarByEmbedding(embedding: number[]): Promise<Confession | null> {
+    const similarityThreshold = 0.1; // Lower is more similar (closer to 0)
+    // Use the pgvector <=> operator directly for cosine distance
+    const result = await db.select()
+        .from(schema.confessions)
+        .where(sql`${schema.confessions.embedding} <=> ${sql.raw(`'${JSON.stringify(embedding)}'`)} < ${similarityThreshold}`)
+        .limit(1);
+    
+    return result[0] || null;
   }
 }

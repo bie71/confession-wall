@@ -138,7 +138,20 @@ const submit = async () => {
     };
     clearForm();
   } catch (err: any) {
-    feedback.value = { type: "error", message: err?.message || "Gagal mengirim. Coba lagi ya." };
+    const knownErrors = [
+      "Message too short",
+      "Message contains prohibited words",
+      "This confession is too similar to a recent post."
+    ];
+    const errorMessage = err?.message || "Gagal mengirim. Coba lagi ya.";
+    
+    if (knownErrors.includes(errorMessage)) {
+      feedback.value = { type: "error", message: errorMessage };
+    } else {
+      // For unknown or server errors
+      console.error("An unexpected error occurred:", err);
+      feedback.value = { type: "error", message: "Terjadi kesalahan pada server. Silakan coba lagi nanti." };
+    }
   } finally {
     sending.value = false;
   }

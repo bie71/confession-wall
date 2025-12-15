@@ -1,30 +1,45 @@
-import { sql } from "drizzle-orm";
-import { db } from "../db";
+import { db } from '../src/infrastructure/database';
+import { users } from '../src/infrastructure/database/schema';
+import { eq } from 'drizzle-orm';
+import logger from '../src/infrastructure/logger';
+import * as dotenv from 'dotenv';
 
-await db.run(sql`CREATE TABLE IF NOT EXISTS confessions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT,
-  message TEXT NOT NULL,
-  likes INTEGER NOT NULL DEFAULT 0,
-  dislikes INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
-  ip_hash TEXT
-);`);
+dotenv.config();
 
-await db.run(sql`CREATE TABLE IF NOT EXISTS votes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  confession_id INTEGER NOT NULL,
-  ip_hash TEXT NOT NULL,
-  value INTEGER NOT NULL,
-  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
-);`);
+const SEED_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@example.com';
+const SEED_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'supersecret';
+const SEED_ADMIN_NAME = process.env.SEED_ADMIN_NAME || 'Admin';
 
-console.log("DB ready");
+const seed = async () => {
+    logger.info('Checking for admin user...');
+    
+    const existingAdmin = await db.select().from(users).where(eq(users.email, SEED_ADMIN_EMAIL));
 
-// Add column status if not exists
-const cols = await db.all(sql`PRAGMA table_info(confessions);`);
-const hasStatus = cols.some((r: any) => r.name === "status");
-if (!hasStatus) {
-  await db.run(sql`ALTER TABLE confessions ADD COLUMN status TEXT NOT NULL DEFAULT 'APPROVED';`);
-  console.log("Added status column");
-}
+    if (existingAdmin.length > 0) {
+        logger.info('Admin user already exists.');
+        return;
+    }
+
+    logger.info('Admin user not found, creating one...');
+
+    const hashedPassword = await Bun.password.hash(SEED_ADMIN_PASSWORD, {
+        algorithm: 'bcrypt',
+        cost: 10,
+    });
+
+    await db.insert(users).values({
+        name: SEED_ADMIN_NAME,
+        email: SEED_ADMIN_EMAIL,
+        password: hashedPassword,
+        role: 'admin',
+    });
+
+    logger.info('Default admin user created successfully!');
+};
+
+seed().catch((err) => {
+    logger.error({ err }, 'Seeding failed');
+    process.exit(1);
+}).finally(() => {
+    logger.info('Seeding process finished.');
+});

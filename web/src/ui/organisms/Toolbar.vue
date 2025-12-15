@@ -55,6 +55,7 @@
 
     <div class="mt-5 flex flex-wrap items-center gap-3">
       <a
+        v-if="isAdmin"
         :href="exportHref"
         target="_blank"
         :class="['inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold transition', ghostButton]"

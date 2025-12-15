@@ -1,18 +1,18 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { bearerAuth } from "hono/bearer-auth";
 import crypto from "crypto";
 import * as useCases from "../container";
 import { ConfessionStatus } from "../../domain/entities/Confession";
 import { loggerMiddleware } from "../middleware/logger";
+import { adminAuthMiddleware, enrichAuthContext } from "../middleware/auth";
 import logger from "../../infrastructure/logger";
 
 const app = new Hono();
+
+// Register Middleware
 app.use('*', loggerMiddleware());
 app.use("*", cors());
-
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "devadmin";
-logger.info(`Admin token configured: ${ADMIN_TOKEN.slice(0, 4)}...`);
+app.use('*', enrichAuthContext()); // Make userId available if token exists
 
 // --- Helper Functions ---
 function ipHash(req: Request) {
@@ -21,7 +21,7 @@ function ipHash(req: Request) {
 }
 
 function toCSV(rows: any[]) {
-  const headers = ["id", "name", "message", "likes", "dislikes", "createdAt", "status"];
+  const headers = ["id", "name", "message", "likes", "dislikes", "createdAt", "status", "userId"];
   const esc = (v: any) => {
     const s = (v ?? "").toString().replace(/"/g, '""');
     return `"${s}"`;
@@ -29,7 +29,7 @@ function toCSV(rows: any[]) {
   return [headers.join(","), ...rows.map(r => headers.map(h => esc(r[h])).join(','))].join("\n");
 }
 
-// --- Routes ---
+// --- Public Routes ---
 app.get("/health", (c) => c.json({ ok: true }));
 
 app.get("/api/confessions", async (c) => {
@@ -44,7 +44,7 @@ app.get("/api/confessions", async (c) => {
     const result = await useCases.listConfessions.execute({ query: q, status, page, limit });
     return c.json(result);
   } catch (error: any) {
-    log.error({ err: error }, 'Failed to list confessions');
+    log.error({ err: error, errorMessage: error.message }, 'Failed to list confessions');
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
@@ -65,7 +65,7 @@ app.get("/api/confessions/export.csv", async (c) => {
         }
     });
   } catch (error: any) {
-    log.error({ err: error }, 'Failed to export confessions');
+    log.error({ err: error, errorMessage: error.message }, 'Failed to export confessions');
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
@@ -75,6 +75,7 @@ app.post("/api/confessions", async (c) => {
   try {
     const body = await c.req.json();
     const { name = "", message = "", website = "" } = body;
+    const userId = c.get('userId'); // Get from enrichAuthContext middleware
 
     if (website) return c.json({ error: "Spam detected" }, 400); // Honeypot
 
@@ -83,15 +84,17 @@ app.post("/api/confessions", async (c) => {
       name: name.slice(0, 40),
       message: message.slice(0, 500),
       ipHash: hash,
+      userId: userId, // Associate with user if logged in
     });
     return c.json(confession, 201);
   } catch (error: any) {
-    log.warn({ err: error, body: c.req.body }, 'Failed to create confession');
+    log.warn({ err: error, errorMessage: error.message, body: c.req.body }, 'Failed to create confession');
     return c.json({ error: error.message }, 400);
   }
 });
 
 app.post("/api/confessions/:id/vote", async (c) => {
+  // Vote logic remains public
   const log = c.get('logger');
   try {
     const id = Number(c.req.param("id"));
@@ -108,56 +111,84 @@ app.post("/api/confessions/:id/vote", async (c) => {
     return c.json(confession);
   } catch (error: any) {
     if (error.message === "You already voted") {
-      log.warn({ err: error }, 'Duplicate vote attempt');
+      log.warn({ err: error, errorMessage: error.message }, 'Duplicate vote attempt');
       return c.json({ error: error.message }, 409);
     }
-    log.error({ err: error }, 'Failed to vote on confession');
+    log.error({ err: error, errorMessage: error.message }, 'Failed to vote on confession');
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
 
+// --- Auth Routes ---
+const auth = new Hono();
+auth.post('/register', async (c) => {
+    const log = c.get('logger');
+    try {
+        const body = await c.req.json();
+        const user = await useCases.registerUser.execute(body);
+        return c.json(user, 201);
+    } catch (error: any) {
+        log.error({ err: error, errorMessage: error.message }, 'User registration failed');
+        return c.json({ error: error.message }, 400);
+    }
+});
+
+auth.post('/login', async (c) => {
+    const log = c.get('logger');
+    try {
+        const body = await c.req.json();
+        const result = await useCases.loginUser.execute(body);
+        return c.json(result);
+    } catch (error: any) {
+        log.warn({ err: error, errorMessage: error.message }, 'User login failed');
+        return c.json({ error: error.message }, 401);
+    }
+});
+app.route("/api/auth", auth);
+
+
 // --- Admin Routes ---
 const admin = new Hono();
-admin.use("*", bearerAuth({ token: ADMIN_TOKEN }));
+admin.use("*", adminAuthMiddleware()); // Protect all admin routes
 
-admin.get("/api/admin/verify", (c) => c.json({ verified: true }));
+admin.get("/verify", (c) => c.json({ verified: true })); // Simple endpoint to verify admin token
 
-admin.post("/api/confessions/:id/approve", async (c) => {
+admin.post("/confessions/:id/approve", async (c) => {
   const log = c.get('logger');
   try {
     const id = Number(c.req.param("id"));
     const confession = await useCases.approveConfession.execute(id);
     return c.json(confession);
   } catch (error: any) {
-    log.error({ err: error, confessionId: c.req.param("id") }, 'Failed to approve confession');
+    log.error({ err: error, errorMessage: error.message, confessionId: c.req.param("id") }, 'Failed to approve confession');
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
 
-admin.post("/api/confessions/:id/reject", async (c) => {
+admin.post("/confessions/:id/reject", async (c) => {
   const log = c.get('logger');
   try {
     const id = Number(c.req.param("id"));
     const confession = await useCases.rejectConfession.execute(id);
     return c.json(confession);
   } catch (error: any) {
-    log.error({ err: error, confessionId: c.req.param("id") }, 'Failed to reject confession');
+    log.error({ err: error, errorMessage: error.message, confessionId: c.req.param("id") }, 'Failed to reject confession');
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
 
-admin.delete("/api/confessions/:id", async (c) => {
+admin.delete("/confessions/:id", async (c) => {
   const log = c.get('logger');
   try {
     const id = Number(c.req.param("id"));
     await useCases.deleteConfession.execute(id);
     return c.json({ success: true });
   } catch (error: any) {
-    log.error({ err: error, confessionId: c.req.param("id") }, 'Failed to delete confession');
+    log.error({ err: error, errorMessage: error.message, confessionId: c.req.param("id") }, 'Failed to delete confession');
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
 
-app.route("/", admin);
+app.route("/api/admin", admin);
 
 export default app;

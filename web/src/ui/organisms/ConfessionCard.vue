@@ -62,13 +62,12 @@ import BaseCard from '../atoms/BaseCard.vue';
 import BaseButton from '../atoms/BaseButton.vue';
 import { Confession } from "../../domain/models/Confession";
 
-const props = defineProps<{ item: Confession; adminToken?: string; theme: "dark" | "light" }>();
+const props = defineProps<{ item: Confession; isAdmin: boolean; theme: "dark" | "light" }>();
 
 const displayName = computed(() => props.item.name?.trim() || "Anon");
 const initials = computed(() => displayName.value.charAt(0).toUpperCase());
 const timeAgoText = computed(() => timeAgo(props.item.createdAt));
-const isAdmin = computed(() => Boolean(props.adminToken?.trim()));
-const showModeration = computed(() => isAdmin.value && props.item.status === "PENDING");
+const showModeration = computed(() => props.isAdmin && props.item.status === "PENDING");
 
 const themeMap = {
   dark: {
@@ -115,12 +114,20 @@ const badge = computed(() => {
   return base;
 });
 
-const timeAgo = (sec: number) => {
-  const d = new Date(sec * 1000);
+const timeAgo = (dateValue: Date | string | number) => {
+  if (!dateValue) return '';
+  
+  // Handle both Unix timestamp (number) and ISO string/Date object
+  const d = typeof dateValue === 'number' ? new Date(dateValue * 1000) : new Date(dateValue);
+
+  if (isNaN(d.getTime())) {
+    return 'Invalid Date'; // Safety check
+  }
+
   const diff = (Date.now() - d.getTime()) / 1000;
   if (diff < 60) return "baru saja";
   if (diff < 3600) return `${Math.floor(diff / 60)} menit lalu`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} jam lalu`;
-  return d.toLocaleString();
+  return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 };
 </script>

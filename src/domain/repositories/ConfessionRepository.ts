@@ -15,10 +15,11 @@ export type PaginatedConfessions = {
 };
 
 export interface IConfessionRepository {
-  create(data: Omit<Confession, 'id' | 'likes' | 'dislikes' | 'createdAt'>): Promise<Confession>;
+  create(data: Omit<Confession, 'id' | 'likes' | 'dislikes' | 'createdAt'> & { embedding: number[], userId?: number | null }): Promise<Confession>;
   update(id: number, data: Partial<Pick<Confession, 'status' | 'likes' | 'dislikes'>>): Promise<Confession | null>;
   delete(id: number): Promise<void>;
   findById(id: number): Promise<Confession | null>;
   findAll(options: FindAllConfessionsOptions): Promise<PaginatedConfessions>;
   export(options: Omit<FindAllConfessionsOptions, 'page' | 'limit'>): Promise<Confession[]>;
+  findSimilarByEmbedding(embedding: number[]): Promise<Confession | null>;
 }

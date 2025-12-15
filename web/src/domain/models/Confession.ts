@@ -4,7 +4,7 @@ export type Confession = {
   message: string;
   likes: number;
   dislikes: number;
-  createdAt: number;
+  createdAt: Date | string | number;
   ipHash: string | null;
   status: 'APPROVED' | 'PENDING' | 'REJECTED';
 };

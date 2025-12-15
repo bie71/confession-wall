@@ -4,19 +4,25 @@
   "scripts": {
     "dev": "bun run index.ts",
     "db:seed": "bun run scripts/seed.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run src/infrastructure/database/migrate.ts",
     "web:dev": "cd web && bun run dev",
     "web:build": "cd web && bun run build",
     "web:preview": "cd web && bun run preview",
     "test": "bun test"
   },
   "dependencies": {
-    "drizzle-orm": "^0.33.0",
-    "hono": "^4.6.0",
+    "@xenova/transformers": "^2.17.2",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.11.1",
     "pino": "^10.1.0",
+    "postgres": "^3.4.7",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/uuid": "^11.0.0",
+    "dotenv": "^17.2.3",
+    "drizzle-kit": "^0.31.8",
     "pino-pretty": "^13.1.3"
   }
 }

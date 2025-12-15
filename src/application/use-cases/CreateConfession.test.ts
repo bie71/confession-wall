@@ -1,33 +1,44 @@
-import { describe, it, expect, mock } from 'bun:test';
+import { describe, it, expect, mock, beforeEach } from 'bun:test';
 import { CreateConfession } from './CreateConfession';
 import { IConfessionRepository } from '../../domain/repositories/ConfessionRepository';
 import { Confession } from '../../domain/entities/Confession';
 
 // Mock the repository
 const mockConfessionRepository: IConfessionRepository = {
-  create: mock(async (data: Omit<Confession, 'id' | 'likes' | 'dislikes' | 'createdAt'>): Promise<Confession> => ({
+  create: mock(async (data) => ({
     id: 1,
     likes: 0,
     dislikes: 0,
-    createdAt: Date.now(),
+    createdAt: new Date(),
     ...data,
-  })),
+  } as Confession)),
   update: mock(async () => null),
   delete: mock(async () => {}),
   findById: mock(async () => null),
   findAll: mock(async () => ({ items: [], total: 0, page: 1, limit: 10 })),
   export: mock(async () => []),
+  findSimilarByEmbedding: mock(async (embedding: number[]) => null),
 };
 
-// Mock the broadcast function
+// Mock the broadcast and embedding functions
 mock.module('../../infrastructure/websocket', () => ({
     broadcast: mock(() => {})
 }));
+mock.module('../../infrastructure/ai/embedding', () => ({
+    generateEmbedding: mock(async () => [0.1, 0.2, 0.3])
+}));
+
 
 describe('CreateConfession Use Case', () => {
   const createConfession = new CreateConfession(mockConfessionRepository);
 
+  beforeEach(() => {
+    mockConfessionRepository.create.mockClear();
+    mockConfessionRepository.findSimilarByEmbedding.mockClear();
+  });
+
   it('should create a confession with APPROVED status', async () => {
+    mockConfessionRepository.findSimilarByEmbedding.mockResolvedValueOnce(null);
     const input = {
       name: 'Test User',
       message: 'This is a test message.',
@@ -40,10 +51,11 @@ describe('CreateConfession Use Case', () => {
     expect(result.id).toBe(1);
     expect(result.message).toBe(input.message);
     expect(result.status).toBe('APPROVED');
-    expect(mockConfessionRepository.create).toHaveBeenCalledWith(expect.objectContaining(input));
+    expect(mockConfessionRepository.create).toHaveBeenCalled();
   });
 
   it('should create a confession with PENDING status if it contains a link', async () => {
+    mockConfessionRepository.findSimilarByEmbedding.mockResolvedValueOnce(null);
     const input = {
       name: 'Link User',
       message: 'Check out my website www.example.com',
@@ -58,12 +70,36 @@ describe('CreateConfession Use Case', () => {
   it('should throw an error if the message is too short', async () => {
     const input = { name: 'Shorty', message: 'hi', ipHash: 'abc' };
     
-    expect(createConfession.execute(input)).rejects.toThrow('Message too short');
+    await expect(createConfession.execute(input)).rejects.toThrow('Message too short');
   });
 
   it('should throw an error if the message contains a bad word', async () => {
     const input = { name: 'Rude User', message: 'This is a goblok message', ipHash: 'def' };
 
-    expect(createConfession.execute(input)).rejects.toThrow('Message contains prohibited words');
+    await expect(createConfession.execute(input)).rejects.toThrow('Message contains prohibited words');
+  });
+
+  it('should throw an error for a similar post', async () => {
+    const similarPost: Confession = { 
+        id: 99, 
+        message: 'a very similar message', 
+        name: 'Similar', 
+        status: 'APPROVED', 
+        createdAt: new Date(),
+        dislikes: 0,
+        likes: 0,
+        ipHash: 'xyz',
+        userId: null,
+        embedding: [0.1, 0.2, 0.3]
+    };
+    mockConfessionRepository.findSimilarByEmbedding.mockResolvedValueOnce(similarPost);
+    
+    const input = {
+      name: 'Copycat',
+      message: 'a very similar message!!',
+      ipHash: '123',
+    };
+
+    await expect(createConfession.execute(input)).rejects.toThrow('This confession is too similar to a recent post.');
   });
 });

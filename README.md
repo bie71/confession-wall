@@ -2,81 +2,235 @@
 
 A full-stack anonymous confession wall application. This project uses a modern, decoupled architecture for better maintainability and scalability.
 
--   **Backend**: Bun + Hono + Drizzle ORM + SQLite
+-   **Backend**: Bun + Hono + Drizzle ORM + PostgreSQL/pgvector
 -   **Frontend**: Vite + Vue 3 + Pinia + Tailwind CSS
 
-## Architecture
+## Technical Details & Architecture
 
-The project has been refactored to use modern architectural patterns.
+This project uses a modern, decoupled architecture for both the backend and frontend to ensure maintainability and scalability.
 
-### Backend: Clean Architecture
+---
 
-The backend is built using **Clean Architecture**. This separates the code into distinct layers, ensuring a clear separation of concerns.
+### **Backend**
 
--   **`src/domain`**: Contains the core business logic, including entities (`Confession`, `Vote`) and repository interfaces. This layer is the heart of the application and has no external dependencies.
--   **`src/application`**: Contains the application-specific use cases (e.g., `CreateConfession`, `ListConfessions`). It orchestrates the flow of data between the presentation layer and the domain repositories.
--   **`src/infrastructure`**: Contains all the external concerns and technical details. This includes the database implementation (Drizzle ORM), the web server entrypoint, and WebSocket handling.
--   **`src/presentation`**: The outermost layer, responsible for handling HTTP requests and responses. It includes the Hono web framework routes and controllers.
+The backend is built using **Clean Architecture** principles to separate concerns and create a system that is independent of frameworks, UI, and databases. It uses PostgreSQL with the `pgvector` extension to enable powerful near-duplicate detection.
 
-### Frontend: Clean Architecture + Atomic Design
+#### **Arsitektur Backend (Clean Architecture)**
 
-The frontend is built using a combination of **Clean Architecture** principles and the **Atomic Design** methodology.
+-   **`src/domain`**: Lapisan terdalam yang berisi logika bisnis inti. Ini termasuk *entities* (model data seperti `User`, `Confession`) dan *repository interfaces* (kontrak untuk akses data). Lapisan ini tidak bergantung pada lapisan lain.
+-   **`src/application`**: Berisi *use cases* spesifik aplikasi (contoh: `RegisterUser`, `CreateConfession`). Lapisan ini mengorkestrasi alur data antara *presentation* dan *domain*.
+-   **`src/infrastructure`**: Berisi implementasi detail teknis dan koneksi ke dunia luar. Termasuk di dalamnya adalah implementasi *repository* (menggunakan Drizzle ORM), koneksi database (PostgreSQL), dan logika untuk AI (model embedding).
+-   **`src/presentation`**: Lapisan terluar yang berinteraksi dengan dunia luar (HTTP). Berisi *routes* (menggunakan Hono), *controllers*, dan *middleware* untuk otentikasi dan logging.
 
--   **`web/src/domain`**: Contains the data models (TypeScript types) shared across the frontend.
--   **`web/src/data`**: Manages all data-related concerns.
-    -   `repositories`: Abstracts the communication with the backend API.
-    -   `stores`: Contains the application's state management, built with Pinia.
--   **`web/src/ui`**: Contains all UI components, structured using Atomic Design.
-    -   `atoms`: The smallest reusable UI elements (e.g., `BaseButton`, `BaseCard`).
-    -   `molecules`: Combinations of atoms to form simple components.
-    -   `organisms`: More complex components built from atoms and molecules (e.g., `ConfessionCard`, `ConfessionForm`).
-    -   `templates`: Page layouts that arrange organisms.
-    -   `pages`: The final pages that users see, composed from templates.
--   **`web/src/composables`**: Reusable Vue Composition API functions (e.g., for theme management).
+#### **Struktur Folder Backend**
+
+```
+/
+├── src/
+│   ├── application/
+│   │   └── use-cases/      # Logika bisnis (misal: CreateConfession.ts)
+│   ├── domain/
+│   │   ├── entities/       # Model data inti (misal: Confession.ts)
+│   │   └── repositories/   # Kontrak/interface untuk database
+│   ├── infrastructure/
+│   │   ├── ai/             # Logika model AI (embedding.ts)
+│   │   ├── database/       # Koneksi, skema (schema.ts), dan implementasi repo
+│   │   └── logger/         # Konfigurasi logging (pino)
+│   └── presentation/
+│       ├── middleware/     # Middleware Hono (auth.ts, logger.ts)
+│       └── routes/         # Definisi endpoint API (index.ts)
+├── drizzle/                # File migrasi database
+├── scripts/
+│   └── seed.ts             # Script untuk membuat data awal (admin)
+└── index.ts                # Titik masuk utama aplikasi
+```
+
+#### **Library Utama Backend**
+
+-   **Runtime**: [Bun](https://bun.sh/)
+-   **Web Framework**: [Hono](https://hono.dev/)
+-   **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
+-   **Database Driver**: [postgres](https://github.com/porsager/postgres)
+-   **Authentication**: [hono/jwt](https://hono.dev/middlewares/jwt)
+-   **Logging**: [pino](https://getpino.io/)
+-   **AI Embeddings**: [@xenova/transformers](https://github.com/xenova/transformers.js)
+
+---
+
+### **Frontend**
+
+The frontend combines **Clean Architecture** for data flow with the **Atomic Design** methodology for UI components. This creates a clear separation between UI, state management, and API communication.
+
+#### **Arsitektur Frontend (Clean Architecture + Atomic Design)**
+
+-   **`web/src/domain`**: Berisi definisi tipe data atau model yang digunakan di seluruh aplikasi frontend (contoh: `Confession`).
+-   **`web/src/data`**: Mengelola semua logika terkait data.
+    -   `repositories`: Abstraksi untuk berkomunikasi dengan backend API.
+    -   `stores`: *State management* terpusat menggunakan Pinia (`authStore`, `wallStore`).
+-   **`web/src/ui`**: Berisi semua komponen Vue, diorganisir dengan metodologi **Atomic Design**.
+    -   `atoms`: Komponen terkecil yang tidak bisa dipecah lagi (misal: `BaseButton.vue`).
+    -   `molecules`: Kumpulan dari beberapa atom (misal: form input dengan labelnya).
+    -   `organisms`: Komponen kompleks yang tersusun dari atom dan molekul (misal: `ConfessionCard.vue`, `LoginForm.vue`).
+    -   `templates`: Tata letak atau kerangka halaman (misal: `AuthTemplate.vue`).
+    -   `pages`: Halaman final yang dilihat pengguna, yang menggunakan *template* dengan data nyata.
+-   **`web/src/composables`**: Berisi *logic* yang dapat digunakan kembali dalam format Vue Composition API (misal: `useTheme.ts`).
+
+#### **Struktur Folder Frontend**
+
+```
+/web
+└── src/
+    ├── domain/
+    │   └── models/           # Definisi tipe data (misal: Confession.ts)
+    ├── data/
+    │   ├── repositories/     # Logika pemanggilan API
+    │   └── stores/           # State management (Pinia)
+    ├── ui/
+    │   ├── atoms/            # Komponen UI terkecil (BaseButton.vue)
+    │   ├── molecules/
+    │   ├── organisms/        # Komponen UI kompleks (LoginForm.vue)
+    │   ├── templates/        # Kerangka halaman (AuthTemplate.vue)
+    │   └── pages/            # Halaman final (LoginPage.vue)
+    ├── composables/          # Reusable logic (useTheme.ts)
+    ├── router.ts             # Konfigurasi routing (vue-router)
+    └── main.ts               # Titik masuk utama aplikasi Vue
+```
+
+#### **Library Utama Frontend**
+
+-   **Framework**: [Vue.js](https://vuejs.org/) 3
+-   **Build Tool**: [Vite](https://vitejs.dev/)
+-   **State Management**: [Pinia](https://pinia.vuejs.org/)
+-   **Routing**: [Vue Router](https://router.vuejs.org/)
+-   **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+
+---
+### **Daftar Perintah (Commands)**
+
+Perintah-perintah ini dijalankan dari direktori root proyek.
+
+-   `bun run dev`: Menjalankan server backend di mode pengembangan.
+-   `bun run web:dev`: Menjalankan server frontend di mode pengembangan.
+-   `bun run db:generate`: Membuat file migrasi database baru berdasarkan perubahan skema.
+-   `bun run db:migrate`: Menjalankan migrasi database yang tertunda.
+-   `bun run db:seed`: Membuat user admin default (data dari `.env`).
+-   `bun test`: Menjalankan unit test untuk backend.
+-   `bun run web:build`: Mem-build aplikasi frontend untuk produksi.
 
 ## Quick Start
 
-```bash
-# Install dependencies for both backend and frontend
-bun install
-cd web
-bun install
-cd ..
+You can run this project in two ways:
 
-# Prepare and start backend
-cp .env.example .env
-bun run db:seed
-bun run dev   # API running at http://localhost:8080
-```
+### Option 1: With Docker (Recommended)
 
-```bash
-# In a separate terminal, start the frontend
-cd web
-bun run dev   # Web app running at http://localhost:5173
-```
+This is the easiest way to get started, as it automatically sets up the PostgreSQL database with the required `pgvector` extension.
+
+1.  **Prerequisite**: Docker must be installed and running.
+
+2.  **Copy Environment File**: Create a `.env` file from the example.
+    ```bash
+    cp .env.example .env
+    ```
+    *(The default `DATABASE_URL` is configured for Docker Compose and does not need to be changed.)*
+
+3.  **Build and Run**: Use Docker Compose to build and run the entire stack (API, Frontend, and Database). The first run may take a few minutes to download the embedding model.
+    ```bash
+    docker compose up --build
+    ```
+
+4.  **Seed Database**: Create a default admin user.
+    ```bash
+    bun run db:seed
+    ```
+    *(Default admin credentials are in `.env.example`)*
+
+5.  **Access the App**:
+    -   Frontend: `http://localhost:5173`
+    -   Backend API: `http://localhost:8080`
+
+### Option 2: Locally (Advanced)
+
+This method requires you to manually install and configure the database.
+
+1.  **Prerequisites**:
+    -   **Bun**: Make sure [Bun](https://bun.sh/docs/installation) is installed.
+    -   **PostgreSQL**: A local PostgreSQL server must be installed and running.
+    -   **pgvector**: The `pgvector` extension must be installed on your PostgreSQL instance. You can follow the instructions [here](https://github.com/pgvector/pgvector).
+
+2.  **Install Dependencies**:
+    ```bash
+    bun install
+    cd web
+    bun install
+    cd ..
+    ```
+
+3.  **Setup Database & Environment**:
+    -   Create a new database in PostgreSQL (e.g., `confessiondb`).
+    -   In your new database, enable the `pgvector` extension by running the SQL command: `CREATE EXTENSION vector;`.
+    -   Copy the environment file: `cp .env.example .env`.
+    -   **Edit `.env`** and update `DATABASE_URL` to point to your local database (e.g., `postgres://YOUR_USER:YOUR_PASSWORD@localhost:5432/confessiondb`).
+
+4.  **Run Database Migrations**: Apply the latest database schema.
+    ```bash
+    bun run db:migrate
+    ```
+
+5.  **Seed Database**: Create a default admin user.
+    ```bash
+    bun run db:seed
+    ```
+    *(Default admin credentials are in `.env.example`)*
+
+6.  **Run the Application**:
+    -   In one terminal, start the backend API. The first run may take a few minutes to download the embedding model.
+        ```bash
+        bun run dev
+        ```
+    -   In a second terminal, start the frontend:
+        ```bash
+        cd web
+        bun run dev
+        ```
+
+## Database Migrations
+
+The project uses Drizzle Kit to manage database schema changes.
+
+1.  **Generate a Migration**: After making changes to the schema in `src/infrastructure/database/schema.ts`, run the following command to generate a new migration file.
+    *(Requires the database to be running via `docker compose up`)*
+    ```bash
+    bun run db:generate
+    ```
+
+2.  **Apply Migrations**: To apply all pending migrations to the database, run:
+    ```bash
+    bun run db:migrate
+    ```
+    *(The `docker compose up` command runs this for you automatically on startup.)*
+
 
 ## Testing
 
-This project includes unit tests for both the backend and frontend.
-
 ```bash
-# Run backend tests (from root directory)
+# Run backend tests
 bun test
 
-# Run frontend tests (from root directory)
-cd web
-bun test
-cd ..
+# Run frontend tests
+cd web && bun test && cd ..
 ```
 
 ## Features
-- WebSocket live update (`/ws`) for create/vote/approve/reject/delete
-- Moderation queue (`status` = APPROVED | PENDING | REJECTED)
-- CSV export: `/api/confessions/export.csv`
-- Honeypot anti-spam + simple bad-words filter
-- Pagination with infinite scroll
-- Glassmorphism UI with dark/light mode
-- Dockerfiles + docker-compose included
+- User Authentication (Register/Login)
+- JWT-based Admin Access
+- AI-powered near-duplicate detection to prevent spammy, similar posts.
+- WebSocket live update (`/ws`) for create/vote/approve/reject/delete.
+- Moderation queue (`status` = APPROVED | PENDING | REJECTED).
+- CSV export: `/api/confessions/export.csv`.
+- Honeypot anti-spam + simple bad-words filter.
+- Pagination with infinite scroll.
+- Glassmorphism UI with dark/light mode.
+- Fully containerized with Docker and Docker Compose.
 
 ---
 

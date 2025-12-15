@@ -1,24 +1,18 @@
-import { Database } from "bun:sqlite";
-import { drizzle } from "drizzle-orm/bun-sqlite";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
+import logger from "../logger";
 
-const sqlite = new Database("confession.db", { create: true });
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is not set");
+}
 
-type RawQuery = { sql: string; params?: any[] };
-const execRaw = <T = any>({ sql, params = [] }: RawQuery) => {
-  const stmt = sqlite.prepare(sql);
-  const isSelect = /^\s*(SELECT|PRAGMA|WITH)/i.test(sql);
-  if (isSelect) {
-    return { rows: stmt.all(...params) as T[] };
-  }
-  stmt.run(...params);
-  return { rows: [] as T[] };
-};
+const connectionString = process.env.DATABASE_URL;
 
-const drizzleDb = drizzle(sqlite, { schema });
-export const db = Object.assign(drizzleDb, {
-  execute: execRaw,
-});
+// Disable pre-fetching all rows from a query
+const client = postgres(connectionString, { prepare: false });
+logger.info("PostgreSQL client connected");
+
+export const db = drizzle(client, { schema, logger: process.env.NODE_ENV !== 'production' });
 
 export { schema };
-export { sqlite };

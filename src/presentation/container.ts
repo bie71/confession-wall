@@ -1,6 +1,7 @@
 // Infrastructure
 import { DrizzleConfessionRepository } from "../infrastructure/database/DrizzleConfessionRepository";
 import { DrizzleVoteRepository } from "../infrastructure/database/DrizzleVoteRepository";
+import { DrizzleUserRepository } from "../infrastructure/database/DrizzleUserRepository";
 
 // Application
 import { CreateConfession } from "../application/use-cases/CreateConfession";
@@ -10,10 +11,13 @@ import { ApproveConfession } from "../application/use-cases/ApproveConfession";
 import { RejectConfession } from "../application/use-cases/RejectConfession";
 import { DeleteConfession } from "../application/use-cases/DeleteConfession";
 import { ExportConfessions } from "../application/use-cases/ExportConfessions";
+import { RegisterUser } from "../application/use-cases/RegisterUser";
+import { LoginUser } from "../application/use-cases/LoginUser";
 
 // Repositories
 const confessionRepository = new DrizzleConfessionRepository();
 const voteRepository = new DrizzleVoteRepository();
+const userRepository = new DrizzleUserRepository();
 
 // Use Cases
 export const createConfession = new CreateConfession(confessionRepository);
@@ -23,3 +27,5 @@ export const approveConfession = new ApproveConfession(confessionRepository);
 export const rejectConfession = new RejectConfession(confessionRepository);
 export const deleteConfession = new DeleteConfession(confessionRepository);
 export const exportConfessions = new ExportConfessions(confessionRepository);
+export const registerUser = new RegisterUser(userRepository);
+export const loginUser = new LoginUser(userRepository);

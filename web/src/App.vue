@@ -1,7 +1,8 @@
 <template>
-  <WallPage />
+  <router-view />
 </template>
 
 <script setup lang="ts">
-import WallPage from './ui/pages/WallPage.vue';
+// This is the root component.
+// The router will render the correct page here.
 </script>
