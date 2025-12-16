@@ -5,6 +5,7 @@ import { ListBadWords } from './ListBadWords';
 import { UpdateBadWord } from './UpdateBadWord';
 import { BadWordRepository } from '../../domain/repositories/BadWordRepository';
 import { BadWord } from '../../domain/entities/BadWord';
+import { BusinessError } from '../../domain/errors/AppError';
 
 const mockBadWordRepository: BadWordRepository = {
   getAll: mock(async () => [new BadWord(1, 'test', new Date())]),
@@ -49,7 +50,7 @@ describe('Bad Word Use Cases', () => {
 
   it('Add: should throw an error if word already exists', async () => {
     const existingWord = 'test';
-    await expect(addBadWord.execute(existingWord)).rejects.toThrow('Word already exists');
+    await expect(addBadWord.execute(existingWord)).rejects.toThrow(new BusinessError('Word already exists'));
   });
 
   // UpdateBadWord
@@ -62,12 +63,12 @@ describe('Bad Word Use Cases', () => {
 
   it('Update: should throw if word to update does not exist', async () => {
     mockBadWordRepository.findById.mockResolvedValueOnce(null);
-    await expect(updateBadWord.execute(99, 'any')).rejects.toThrow('Word not found');
+    await expect(updateBadWord.execute(99, 'any')).rejects.toThrow(new BusinessError('Word not found'));
   });
 
   it('Update: should throw if new word name already exists', async () => {
     mockBadWordRepository.findByWord.mockResolvedValueOnce(new BadWord(2, 'new', new Date()));
-    await expect(updateBadWord.execute(1, 'new')).rejects.toThrow('New word already exists');
+    await expect(updateBadWord.execute(1, 'new')).rejects.toThrow(new BusinessError('New word already exists'));
   });
   
   // DeleteBadWord
@@ -78,6 +79,6 @@ describe('Bad Word Use Cases', () => {
 
   it('Delete: should throw if word to delete does not exist', async () => {
     mockBadWordRepository.findById.mockResolvedValueOnce(null);
-    await expect(deleteBadWord.execute(99)).rejects.toThrow('Word not found');
+    await expect(deleteBadWord.execute(99)).rejects.toThrow(new BusinessError('Word not found'));
   });
 });

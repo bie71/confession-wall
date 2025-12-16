@@ -1,6 +1,7 @@
 import { IUserRepository, UserCreationData } from '../../domain/repositories/UserRepository';
 import { User } from '../../domain/entities/User';
 import logger from '../../infrastructure/logger';
+import { BusinessError } from '../../domain/errors/AppError';
 
 export class RegisterUser {
   constructor(private userRepository: IUserRepository) {}
@@ -9,12 +10,12 @@ export class RegisterUser {
     const { email, password, passwordConfirmation } = data;
 
     if (password !== passwordConfirmation) {
-      throw new Error('Password and confirmation do not match.');
+      throw new BusinessError('Password and confirmation do not match.');
     }
 
     const existingUser = await this.userRepository.findByEmail(email);
     if (existingUser) {
-      throw new Error('An account with this email already exists.');
+      throw new BusinessError('An account with this email already exists.');
     }
 
     const hashedPassword = await Bun.password.hash(password, {

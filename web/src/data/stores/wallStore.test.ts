@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { useWallStore } from './wallStore';
 import { confessionApiRepository } from '../repositories/ConfessionApiRepository';
 
+const createMock = mock(async (data) => ({ ...data, id: 99, status: 'APPROVED' }));
 // Mock the entire repository module
 mock.module('../repositories/ConfessionApiRepository', () => ({
   confessionApiRepository: {
@@ -12,6 +13,7 @@ mock.module('../repositories/ConfessionApiRepository', () => ({
       page: 1,
       limit: 10
     })),
+    create: createMock,
   }
 }));
 
@@ -21,7 +23,9 @@ describe('Wall Store', () => {
     // Create a new Pinia instance for each test
     setActivePinia(createPinia());
     // Reset mocks
-    confessionApiRepository.list.mockClear();
+    (confessionApiRepository.list as any).mockClear();
+    createMock.mockClear();
+    createMock.mockResolvedValue({ id: 99, status: 'APPROVED' });
   });
 
   it('initializes with correct default values', () => {
@@ -30,6 +34,9 @@ describe('Wall Store', () => {
     expect(wall.loading).toBe(false);
     expect(wall.total).toBe(0);
     expect(wall.page).toBe(1);
+    expect(wall.submissionLoading).toBe(false);
+    expect(wall.submissionError).toBeNull();
+    expect(wall.submissionSuccess).toBeNull();
   });
 
   it('`loadMore` action fetches confessions and updates state', async () => {
@@ -90,5 +97,45 @@ describe('Wall Store', () => {
     });
     // refresh calls loadMore, so it's called once
     expect(confessionApiRepository.list).toHaveBeenCalledTimes(1);
+  });
+
+  describe('createConfession Action', () => {
+    it('handles successful submission', async () => {
+      const wall = useWallStore();
+      const newConfession = { name: 'Author', message: 'A new hope', website: '' };
+      
+      const result = await wall.createConfession(newConfession);
+
+      expect(result).toBe(true);
+      expect(wall.submissionLoading).toBe(false);
+      expect(wall.submissionError).toBeNull();
+      expect(wall.submissionSuccess).not.toBeNull();
+      expect(createMock).toHaveBeenCalledWith(newConfession);
+    });
+
+    it('handles failed submission', async () => {
+      const wall = useWallStore();
+      const errorMessage = 'Contains bad words';
+      createMock.mockRejectedValueOnce(new Error(errorMessage));
+      const newConfession = { name: 'Author', message: 'A bad message', website: '' };
+
+      const result = await wall.createConfession(newConfession);
+
+      expect(result).toBe(false);
+      expect(wall.submissionLoading).toBe(false);
+      expect(wall.submissionSuccess).toBeNull();
+      expect(wall.submissionError).toBe(errorMessage);
+    });
+
+    it('`clearSubmissionStatus` clears success and error messages', () => {
+        const wall = useWallStore();
+        wall.submissionError = 'An error';
+        wall.submissionSuccess = 'A success';
+
+        wall.clearSubmissionStatus();
+
+        expect(wall.submissionError).toBeNull();
+        expect(wall.submissionSuccess).toBeNull();
+    });
   });
 });

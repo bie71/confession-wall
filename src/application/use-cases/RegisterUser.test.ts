@@ -2,6 +2,7 @@ import { describe, it, expect, mock } from 'bun:test';
 import { RegisterUser } from './RegisterUser';
 import { IUserRepository } from '../../domain/repositories/UserRepository';
 import { User } from '../../domain/entities/User';
+import { BusinessError } from '../../domain/errors/AppError';
 
 const mockUserRepository: IUserRepository = {
   create: mock(async (data) => ({
@@ -13,6 +14,10 @@ const mockUserRepository: IUserRepository = {
   })),
   findByEmail: mock(async (email: string) => null),
   findById: mock(async (id: number) => null),
+  delete: mock(),
+  findAll: mock(),
+  save: mock(),
+  update: mock(),
 };
 
 describe('RegisterUser Use Case', () => {
@@ -43,7 +48,7 @@ describe('RegisterUser Use Case', () => {
       passwordConfirmation: 'password456',
     };
     
-    await expect(registerUser.execute(input)).rejects.toThrow('Password and confirmation do not match.');
+    await expect(registerUser.execute(input)).rejects.toThrow(new BusinessError('Password and confirmation do not match.'));
   });
 
   it('should throw an error if email already exists', async () => {
@@ -58,6 +63,6 @@ describe('RegisterUser Use Case', () => {
         id: 2, name: 'Existing', email: 'exists@example.com', role: 'user', createdAt: new Date()
     });
 
-    await expect(registerUser.execute(input)).rejects.toThrow('An account with this email already exists.');
+    await expect(registerUser.execute(input)).rejects.toThrow(new BusinessError('An account with this email already exists.'));
   });
 });

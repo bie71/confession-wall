@@ -4,6 +4,7 @@ import { IConfessionRepository } from '../../domain/repositories/ConfessionRepos
 import { Confession } from '../../domain/entities/Confession';
 import { BadWordRepository } from '../../domain/repositories/BadWordRepository';
 import { BadWord } from '../../domain/entities/BadWord';
+import { BusinessError } from '../../domain/errors/AppError';
 
 // Mock the repositories
 const mockConfessionRepository: IConfessionRepository = {
@@ -85,13 +86,13 @@ describe('CreateConfession Use Case', () => {
   it('should throw an error if the message is too short', async () => {
     const input = { name: 'Shorty', message: 'hi', ipHash: 'abc' };
     
-    await expect(createConfession.execute(input)).rejects.toThrow('Message too short');
+    await expect(createConfession.execute(input)).rejects.toThrow(new BusinessError('Message too short'));
   });
 
   it('should throw an error if the message contains a bad word', async () => {
     const input = { name: 'Rude User', message: 'This is a goblok message', ipHash: 'def' };
 
-    await expect(createConfession.execute(input)).rejects.toThrow('Pesan mengandung kata-kata yang dilarang.');
+    await expect(createConfession.execute(input)).rejects.toThrow(new BusinessError('Pesan mengandung kata-kata yang dilarang.'));
     expect(mockBadWordRepository.getAll).toHaveBeenCalledTimes(1);
   });
 
@@ -116,6 +117,6 @@ describe('CreateConfession Use Case', () => {
       ipHash: '123',
     };
 
-    await expect(createConfession.execute(input)).rejects.toThrow('This confession is too similar to a recent post.');
+    await expect(createConfession.execute(input)).rejects.toThrow(new BusinessError('This confession is too similar to a recent post.'));
   });
 });

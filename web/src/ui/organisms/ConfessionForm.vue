@@ -1,6 +1,6 @@
 <template>
   <form
-    :class="['rounded-[32px] border p-6 backdrop-blur transition-colors duration-300', themeConfig.wrapper, themeConfig.shadow]"
+    :class="['rounded-[32px] border p-6 backdrop-blur transition-colors duration-300 mb-8', themeConfig.wrapper, themeConfig.shadow]"
     @submit.prevent="submit"
   >
     <div class="flex items-center justify-between gap-4">
@@ -37,6 +37,7 @@
           :theme="theme"
           class="mt-2 min-h-[120px]"
           placeholder="Tulis minimal 3 karakter. Link otomatis ditandai pending untuk dicek admin."
+          @input="wallStore.clearSubmissionStatus"
         />
         <div class="mt-1 flex items-center justify-between text-xs">
           <span :class="remaining < 0 ? 'text-rose-400' : themeConfig.subtle">
@@ -47,16 +48,19 @@
       </div>
     </div>
 
-    <div class="mt-4 flex flex-wrap items-center gap-3">
-      <p v-if="feedback" :class="feedback.type === 'success' ? themeConfig.success : 'text-rose-400'">
-        {{ feedback.message }}
+    <div class="mt-2 min-h-[20px]">
+      <p v-if="submissionError || submissionSuccess" :class="['text-sm', submissionError ? 'text-rose-400' : themeConfig.success]">
+        {{ submissionError || submissionSuccess }}
       </p>
+    </div>
+
+    <div class="mt-2 flex flex-wrap items-center gap-3">
       <div class="ml-auto flex items-center gap-3">
         <BaseButton
           :theme="theme"
           variant="ghost"
           type="button"
-          @click="clearForm"
+          @click="handleClearButtonClick"
         >
           Hapus
         </BaseButton>
@@ -64,9 +68,9 @@
           :theme="theme"
           variant="primary"
           type="submit"
-          :disabled="!canSubmit || sending"
+          :disabled="!canSubmit || submissionLoading"
         >
-          {{ sending ? "Mengirim..." : "Kirim" }}
+          {{ submissionLoading ? "Mengirim..." : "Kirim" }}
         </BaseButton>
       </div>
     </div>
@@ -75,20 +79,23 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { confessionApiRepository } from '../../data/repositories/ConfessionApiRepository';
+import { useWallStore } from '../../data/stores/wallStore';
+import { storeToRefs } from "pinia";
 
 import BaseInput from '../atoms/BaseInput.vue';
 import BaseTextarea from '../atoms/BaseTextarea.vue';
 import BaseButton from '../atoms/BaseButton.vue';
+import BaseErrorMessage from '../atoms/BaseErrorMessage.vue';
 
 const props = defineProps<{ theme: "dark" | "light" }>();
+
+const wallStore = useWallStore();
+const { submissionLoading, submissionError, submissionSuccess } = storeToRefs(wallStore);
 
 const MAX_CHAR = 500;
 const name = ref("");
 const message = ref("");
 const website = ref(""); // Honeypot
-const sending = ref(false);
-const feedback = ref<{ type: "success" | "error"; message: string } | null>(null);
 
 const themeMap = {
   dark: {
@@ -116,44 +123,28 @@ const themeConfig = computed(() => themeMap[props.theme ?? "dark"]);
 const remaining = computed(() => MAX_CHAR - message.value.length);
 const canSubmit = computed(() => message.value.trim().length >= 3 && remaining.value >= 0);
 
-const clearForm = () => {
+const clearFormInputs = () => {
   name.value = "";
   message.value = "";
   website.value = "";
 };
 
+const handleClearButtonClick = () => {
+  clearFormInputs();
+  wallStore.clearSubmissionStatus();
+};
+
 const submit = async () => {
-  if (!canSubmit.value || sending.value) return;
-  sending.value = true;
-  feedback.value = null;
-  try {
-    const res = await confessionApiRepository.create({
-      name: name.value.trim(),
-      message: message.value.trim(),
-      website: website.value,
-    });
-    feedback.value = {
-      type: "success",
-      message: res.status === "PENDING" ? "Terkirim! Menunggu moderasi." : "Terkirim dan sudah tampil publik.",
-    };
-    clearForm();
-  } catch (err: any) {
-    const knownErrors = [
-      "Message too short",
-      "Message contains prohibited words",
-      "This confession is too similar to a recent post."
-    ];
-    const errorMessage = err?.message || "Gagal mengirim. Coba lagi ya.";
-    
-    if (knownErrors.includes(errorMessage)) {
-      feedback.value = { type: "error", message: errorMessage };
-    } else {
-      // For unknown or server errors
-      console.error("An unexpected error occurred:", err);
-      feedback.value = { type: "error", message: "Terjadi kesalahan pada server. Silakan coba lagi nanti." };
-    }
-  } finally {
-    sending.value = false;
+  if (!canSubmit.value || submissionLoading.value) return;
+  
+  const success = await wallStore.createConfession({
+    name: name.value.trim(),
+    message: message.value.trim(),
+    website: website.value,
+  });
+
+  if (success) {
+    clearFormInputs();
   }
 };
 </script>

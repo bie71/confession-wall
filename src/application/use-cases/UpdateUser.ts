@@ -1,4 +1,5 @@
 import { IUserRepository } from "../../domain/repositories/UserRepository";
+import { BusinessError } from "../../domain/errors/AppError";
 
 type UpdateData = {
     name?: string;
@@ -11,13 +12,13 @@ export class UpdateUser {
   async execute(id: number, data: UpdateData) {
     const user = await this.userRepository.findById(id);
     if (!user) {
-        throw new Error('User not found');
+        throw new BusinessError('User not found');
     }
 
     if (data.email && data.email !== user.email) {
         const existing = await this.userRepository.findByEmail(data.email);
         if (existing) {
-            throw new Error('Email already in use');
+            throw new BusinessError('Email already in use');
         }
     }
 

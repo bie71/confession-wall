@@ -2,6 +2,7 @@ import { IConfessionRepository } from "../../domain/repositories/ConfessionRepos
 import { IVoteRepository } from "../../domain/repositories/VoteRepository";
 import { Confession } from "../../domain/entities/Confession";
 import { broadcast } from "../../infrastructure/websocket";
+import { BusinessError } from "../../domain/errors/AppError";
 
 export class VoteOnConfession {
   constructor(
@@ -18,7 +19,7 @@ export class VoteOnConfession {
 
     const existingVote = await this.voteRepository.findByConfessionAndIp(confessionId, ipHash);
     if (existingVote) {
-      throw new Error("You already voted");
+      throw new BusinessError("You already voted");
     }
     
     await this.voteRepository.create({
@@ -32,7 +33,7 @@ export class VoteOnConfession {
     });
 
     if (!updatedConfession) {
-      throw new Error("Confession not found");
+      throw new BusinessError("Confession not found");
     }
 
     broadcast({ type: "voted", item: updatedConfession });

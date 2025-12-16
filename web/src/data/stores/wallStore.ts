@@ -17,8 +17,14 @@ export const useWallStore = defineStore('wall', () => {
   const page = ref(1);
   const limit = ref(10);
   const total = ref(0);
-  const loading = ref(false);
+  const loading = ref(false); // For list loading
   const ws = ref<WebSocket | null>(null);
+
+  // State for the submission form
+  const submissionLoading = ref(false);
+  const submissionError = ref<string | null>(null);
+  const submissionSuccess = ref<string | null>(null);
+
 
   // --- Getters ---
   const hasMore = computed(() => items.value.length < total.value);
@@ -90,6 +96,26 @@ export const useWallStore = defineStore('wall', () => {
     await refresh();
   }
 
+  function clearSubmissionStatus() {
+    submissionError.value = null;
+    submissionSuccess.value = null;
+  }
+
+  async function createConfession(data: { name: string; message: string; website: string }) {
+    submissionLoading.value = true;
+    clearSubmissionStatus();
+    try {
+      const res = await confessionApiRepository.create(data);
+      submissionSuccess.value = res.status === "PENDING" ? "Terkirim! Menunggu moderasi." : "Terkirim dan sudah tampil publik.";
+      return true; // Indicate success
+    } catch (err: any) {
+      submissionError.value = err.message || "Gagal mengirim. Coba lagi ya.";
+      return false; // Indicate failure
+    } finally {
+      submissionLoading.value = false;
+    }
+  }
+
   return {
     items,
     q,
@@ -99,6 +125,9 @@ export const useWallStore = defineStore('wall', () => {
     total,
     loading,
     ws,
+    submissionLoading,
+    submissionError,
+    submissionSuccess,
     hasMore,
     totalPages,
     currentPage,
@@ -106,5 +135,7 @@ export const useWallStore = defineStore('wall', () => {
     refresh,
     connectWS,
     setStatus,
+    createConfession,
+    clearSubmissionStatus,
   };
 });

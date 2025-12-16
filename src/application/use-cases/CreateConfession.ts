@@ -4,6 +4,7 @@ import { broadcast } from "../../infrastructure/websocket";
 import { generateEmbedding } from "../../infrastructure/ai/embedding";
 import logger from "../../infrastructure/logger";
 import { BadWordRepository } from "../../domain/repositories/BadWordRepository";
+import { BusinessError } from "../../domain/errors/AppError";
 
 export class CreateConfession {
   constructor(
@@ -20,7 +21,7 @@ export class CreateConfession {
     const { name, message, ipHash, userId } = input;
 
     if (!message || message.length < 3) {
-      throw new Error("Message too short");
+      throw new BusinessError("Message too short");
     }
 
     const badWords = await this.badWordRepository.getAll();
@@ -28,7 +29,7 @@ export class CreateConfession {
 
     const lower = message.toLowerCase();
     if (badWordStrings.some(w => lower.includes(w))) {
-      throw new Error("Pesan mengandung kata-kata yang dilarang.");
+      throw new BusinessError("Pesan mengandung kata-kata yang dilarang.");
     }
 
     // Generate embedding and check for duplicates
@@ -39,7 +40,7 @@ export class CreateConfession {
     
     if (similarPost) {
       logger.warn({ similarPostId: similarPost.id }, 'Duplicate post detected.');
-      throw new Error("This confession is too similar to a recent post.");
+      throw new BusinessError("This confession is too similar to a recent post.");
     }
 
     const hasLink = /https?:\/\/|www\.|@/.test(message);

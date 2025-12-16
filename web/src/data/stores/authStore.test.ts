@@ -4,13 +4,16 @@ import { useAuthStore } from './authStore';
 import { authApiRepository } from '../repositories/AuthApiRepository';
 
 // Mock the repository
+const loginMock = mock(async () => ({
+  user: { id: 1, name: 'Test User', email: 'test@example.com', role: 'user' },
+  token: 'fake-jwt-token',
+}));
+const registerMock = mock(async () => {});
+
 mock.module('../repositories/AuthApiRepository', () => ({
   authApiRepository: {
-    login: mock(async () => ({
-      user: { id: 1, name: 'Test User', email: 'test@example.com', role: 'user' },
-      token: 'fake-jwt-token',
-    })),
-    register: mock(async () => {}),
+    login: loginMock,
+    register: registerMock,
   }
 }));
 
@@ -44,7 +47,12 @@ describe('Auth Store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     localStorage.clear();
-    authApiRepository.login.mockClear();
+    loginMock.mockClear();
+    registerMock.mockClear();
+    loginMock.mockResolvedValue({
+        user: { id: 1, name: 'Test User', email: 'test@example.com', role: 'user' },
+        token: 'fake-jwt-token',
+    });
   });
 
   it('initializes with no user or token', () => {
@@ -60,7 +68,7 @@ describe('Auth Store', () => {
     
     await auth.login(credentials);
 
-    expect(authApiRepository.login).toHaveBeenCalledWith(credentials);
+    expect(loginMock).toHaveBeenCalledWith(credentials);
     expect(auth.token).toBe('fake-jwt-token');
     expect(auth.user.name).toBe('Test User');
     expect(auth.isLoggedIn).toBe(true);
@@ -91,11 +99,36 @@ describe('Auth Store', () => {
     expect(auth.isAdmin).toBe(false);
 
     // Log in as an admin
-    authApiRepository.login.mockResolvedValueOnce({
+    loginMock.mockResolvedValueOnce({
         user: { id: 2, name: 'Admin User', email: 'admin@example.com', role: 'admin' },
         token: 'fake-admin-token',
     });
     await auth.login({ email: 'admin@example.com', password: 'password' });
     expect(auth.isAdmin).toBe(true);
+  });
+
+  describe('Error Handling', () => {
+    it('sets error state on failed login', async () => {
+        const auth = useAuthStore();
+        const errorMessage = 'Invalid credentials';
+        loginMock.mockRejectedValueOnce(new Error(errorMessage));
+
+        await auth.login({ email: 'test@example.com', password: 'wrongpassword' });
+
+        expect(auth.loading).toBe(false);
+        expect(auth.error).toBe(errorMessage);
+        expect(auth.user).toBeNull();
+        expect(auth.token).toBeNull();
+        expect(auth.isLoggedIn).toBe(false);
+    });
+
+    it('clearError action clears the error state', () => {
+        const auth = useAuthStore();
+        auth.error = 'An old error';
+        
+        auth.clearError();
+
+        expect(auth.error).toBeNull();
+    });
   });
 });
