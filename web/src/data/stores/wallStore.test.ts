@@ -74,4 +74,21 @@ describe('Wall Store', () => {
     wall.total = 5; // Manually set total higher
     expect(wall.hasMore).toBe(true);
   });
+
+  it('`setStatus` action updates status and refreshes', async () => {
+    const wall = useWallStore();
+    expect(wall.status).toBe('APPROVED'); // Default
+    
+    await wall.setStatus('PENDING');
+
+    expect(wall.status).toBe('PENDING');
+    expect(confessionApiRepository.list).toHaveBeenCalledWith({
+        q: '',
+        page: 1,
+        limit: 10,
+        status: 'PENDING'
+    });
+    // refresh calls loadMore, so it's called once
+    expect(confessionApiRepository.list).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,5 +1,5 @@
 <template>
-  <div :class="['relative min-h-screen overflow-hidden transition-colors duration-300', themeClasses.root]">
+  <div :class="['relative min-h-screen transition-colors duration-300', themeClasses.root]">
     <div class="pointer-events-none absolute inset-0">
       <div :class="['absolute -top-24 -right-10 h-80 w-80 rounded-full blur-[120px]', themeClasses.accentTop]"></div>
       <div :class="['absolute bottom-0 left-1/3 h-72 w-72 rounded-full blur-[120px]', themeClasses.accentBottom]"></div>
@@ -32,6 +32,9 @@
                     You are logged in as an <span class="font-semibold">{{ auth.user.role }}</span>.
                   </p>
                 </div>
+                <router-link v-if="isAdmin" to="/admin" class="ml-4 font-semibold text-emerald-400 hover:underline">
+                  Admin Panel
+                </router-link>
                 <BaseButton :theme="theme" variant="ghost" @click="handleLogout" class="ml-auto !px-3 !py-1">
                   Logout
                 </BaseButton>

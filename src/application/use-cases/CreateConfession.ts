@@ -3,12 +3,13 @@ import { Confession } from "../../domain/entities/Confession";
 import { broadcast } from "../../infrastructure/websocket";
 import { generateEmbedding } from "../../infrastructure/ai/embedding";
 import logger from "../../infrastructure/logger";
-
-// Naive bad-words list (can be moved to a more robust service)
-const BAD_WORDS = ["bangsat", "anjing", "goblok"];
+import { BadWordRepository } from "../../domain/repositories/BadWordRepository";
 
 export class CreateConfession {
-  constructor(private confessionRepository: IConfessionRepository) {}
+  constructor(
+    private confessionRepository: IConfessionRepository,
+    private badWordRepository: BadWordRepository,
+  ) {}
 
   async execute(input: {
     name: string;
@@ -22,9 +23,12 @@ export class CreateConfession {
       throw new Error("Message too short");
     }
 
+    const badWords = await this.badWordRepository.getAll();
+    const badWordStrings = badWords.map(bw => bw.word.toLowerCase());
+
     const lower = message.toLowerCase();
-    if (BAD_WORDS.some(w => lower.includes(w))) {
-      throw new Error("Message contains prohibited words");
+    if (badWordStrings.some(w => lower.includes(w))) {
+      throw new Error("Pesan mengandung kata-kata yang dilarang.");
     }
 
     // Generate embedding and check for duplicates

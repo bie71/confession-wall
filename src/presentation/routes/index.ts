@@ -5,7 +5,8 @@ import * as useCases from "../container";
 import { ConfessionStatus } from "../../domain/entities/Confession";
 import { loggerMiddleware } from "../middleware/logger";
 import { adminAuthMiddleware, enrichAuthContext } from "../middleware/auth";
-import logger from "../../infrastructure/logger";
+import badWordsAdmin from "./adminBadWords";
+import usersAdmin from "./adminUsers";
 
 const app = new Hono();
 
@@ -129,6 +130,8 @@ app.route("/api/auth", auth);
 // --- Admin Routes ---
 const admin = new Hono();
 admin.use("*", adminAuthMiddleware()); // Protect all admin routes
+admin.route("/", badWordsAdmin);
+admin.route("/", usersAdmin);
 
 admin.get("/verify", (c) => c.json({ verified: true })); // Simple endpoint to verify admin token
 

@@ -83,6 +83,12 @@ export const useWallStore = defineStore('wall', () => {
       }
     };
   }
+  
+  async function setStatus(newStatus: ConfessionStatus) {
+    if (status.value === newStatus) return;
+    status.value = newStatus;
+    await refresh();
+  }
 
   return {
     items,
@@ -99,5 +105,6 @@ export const useWallStore = defineStore('wall', () => {
     loadMore,
     refresh,
     connectWS,
+    setStatus,
   };
 });

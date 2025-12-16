@@ -45,3 +45,9 @@ export const votes = pgTable("votes", {
   value: integer("value").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const badWords = pgTable("bad_words", {
+  id: serial("id").primaryKey(),
+  word: varchar("word", { length: 256 }).notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

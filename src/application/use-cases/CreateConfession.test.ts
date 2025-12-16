@@ -2,8 +2,10 @@ import { describe, it, expect, mock, beforeEach } from 'bun:test';
 import { CreateConfession } from './CreateConfession';
 import { IConfessionRepository } from '../../domain/repositories/ConfessionRepository';
 import { Confession } from '../../domain/entities/Confession';
+import { BadWordRepository } from '../../domain/repositories/BadWordRepository';
+import { BadWord } from '../../domain/entities/BadWord';
 
-// Mock the repository
+// Mock the repositories
 const mockConfessionRepository: IConfessionRepository = {
   create: mock(async (data) => ({
     id: 1,
@@ -20,6 +22,18 @@ const mockConfessionRepository: IConfessionRepository = {
   findSimilarByEmbedding: mock(async (embedding: number[]) => null),
 };
 
+const mockBadWordRepository: BadWordRepository = {
+  getAll: mock(async () => [
+    new BadWord(1, 'goblok', new Date()),
+    new BadWord(2, 'bangsat', new Date()),
+  ]),
+  add: mock(async (word) => new BadWord(3, word, new Date())),
+  findById: mock(async () => null),
+  findByWord: mock(async () => null),
+  update: mock(async () => {}),
+  delete: mock(async () => {}),
+};
+
 // Mock the broadcast and embedding functions
 mock.module('../../infrastructure/websocket', () => ({
     broadcast: mock(() => {})
@@ -30,11 +44,12 @@ mock.module('../../infrastructure/ai/embedding', () => ({
 
 
 describe('CreateConfession Use Case', () => {
-  const createConfession = new CreateConfession(mockConfessionRepository);
+  const createConfession = new CreateConfession(mockConfessionRepository, mockBadWordRepository);
 
   beforeEach(() => {
     mockConfessionRepository.create.mockClear();
     mockConfessionRepository.findSimilarByEmbedding.mockClear();
+    mockBadWordRepository.getAll.mockClear();
   });
 
   it('should create a confession with APPROVED status', async () => {
@@ -76,7 +91,8 @@ describe('CreateConfession Use Case', () => {
   it('should throw an error if the message contains a bad word', async () => {
     const input = { name: 'Rude User', message: 'This is a goblok message', ipHash: 'def' };
 
-    await expect(createConfession.execute(input)).rejects.toThrow('Message contains prohibited words');
+    await expect(createConfession.execute(input)).rejects.toThrow('Pesan mengandung kata-kata yang dilarang.');
+    expect(mockBadWordRepository.getAll).toHaveBeenCalledTimes(1);
   });
 
   it('should throw an error for a similar post', async () => {
