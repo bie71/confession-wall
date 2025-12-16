@@ -6,7 +6,7 @@
     </div>
 
     <main class="relative z-10 mx-auto grid max-w-[100rem] gap-6 px-6 py-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)] lg:items-start">
-      <div class="flex flex-col gap-6 lg:sticky lg:top-8 lg:pr-3">
+      <div class="flex flex-col gap-6 lg:sticky lg:top-3 lg:pr-3">
         <section :class="['rounded-[32px] border p-6 backdrop-blur', themeClasses.card, themeClasses.shadow]">
           <header class="flex flex-col gap-6">
             <div class="space-y-3">
@@ -14,7 +14,7 @@
                 <span class="material-symbols-outlined text-base">forum</span>
                 CONFESSION WALL
               </div>
-              <h1 :class="['text-3xl font-semibold md:text-4xl', themeClasses.heading]">
+              <h1 :class="['text-2xl font-semibold md:text-3xl', themeClasses.heading]">
                 Tuangkan cerita, dengarkan komunitas.
               </h1>
               <p :class="themeClasses.muted">
@@ -48,15 +48,15 @@
 
           </header>
 
-          <dl class="mt-6 grid gap-4 sm:grid-cols-3">
+          <dl class="mt-4 grid gap-4 sm:grid-cols-3">
             <div :class="['rounded-2xl border p-4', themeClasses.cardSoft]">
               <dt :class="['text-xs uppercase tracking-widest', themeClasses.label]">Total data</dt>
-              <dd :class="['text-3xl font-semibold', themeClasses.heading]">{{ wall.total }}</dd>
+              <dd :class="['text-2xl font-semibold', themeClasses.heading]">{{ wall.total }}</dd>
               <p :class="['text-xs', themeClasses.subtle]">Hasil dari filter saat ini.</p>
             </div>
             <div :class="['rounded-2xl border p-4', themeClasses.cardSoft]">
               <dt :class="['text-xs uppercase tracking-widest', themeClasses.label]">Sedang tampil</dt>
-              <dd :class="['text-3xl font-semibold', themeClasses.heading]">{{ visibleCount }}</dd>
+              <dd :class="['text-2xl font-semibold', themeClasses.heading]">{{ visibleCount }}</dd>
               <p :class="['text-xs', themeClasses.subtle]">Scroll ke bawah untuk muat lebih banyak.</p>
             </div>
             <div :class="['rounded-2xl border p-4', themeClasses.cardSoft]">
